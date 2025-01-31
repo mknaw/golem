@@ -1529,6 +1529,17 @@ async fn build_client<CPE: ComponentPropertiesExtensions>(
                         let stub_def = ctx.component_stub_def(&component.name)?;
                         commands::generate::generate_and_copy_client_wit(stub_def, &client_wit)
                     }
+                    DependencyType::Grpc => {
+                        log_action(
+                            "Building",
+                            format!(
+                                "WASM gRPC client for {}",
+                                component.name.as_str().log_color_highlight()
+                            ),
+                        );
+                        // TODO implement!
+                        Ok(())
+                    }
                 }
             }
             .await,

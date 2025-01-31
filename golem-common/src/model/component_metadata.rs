@@ -54,6 +54,7 @@ impl ComponentMetadata {
 #[serde(tag = "type")]
 pub enum DynamicLinkedInstance {
     WasmRpc(DynamicLinkedWasmRpc),
+    // TODO might have to add GRPC, OpenAPI types here.
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Encode, Decode)]

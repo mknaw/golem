@@ -45,6 +45,9 @@ pub mod poem;
 #[cfg(feature = "protobuf")]
 pub mod protobuf;
 
+// TODO #[cfg(...)]
+pub mod grpc;
+
 /// Serde instances for WitValue
 #[cfg(feature = "serde")]
 pub mod serde;

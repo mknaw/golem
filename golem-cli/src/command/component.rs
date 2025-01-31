@@ -705,7 +705,7 @@ impl ApplicationComponentContext {
             .application
             .component_wasm_rpc_dependencies(component_name)
             .iter()
-            .filter(|dep| dep.dep_type == DependencyType::DynamicWasmRpc)
+            .filter(|dep| dep.dep_type.should_do_dynamic_linking())
             .cloned()
             .collect::<Vec<_>>();
 

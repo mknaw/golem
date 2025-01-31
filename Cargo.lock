@@ -4307,6 +4307,7 @@ dependencies = [
 name = "golem-wasm-rpc"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "arbitrary",
  "async-recursion",
  "async-trait",
@@ -4320,6 +4321,9 @@ dependencies = [
  "proptest-arbitrary-interop",
  "prost 0.13.4",
  "prost-build 0.13.4",
+ "prost-types 0.13.4",
+ "protox-parse",
+ "semver",
  "serde",
  "serde_json",
  "test-r",
@@ -4328,6 +4332,7 @@ dependencies = [
  "wasmtime",
  "wasmtime-wasi",
  "wit-bindgen-rt",
+ "wit-encoder",
 ]
 
 [[package]]

@@ -128,6 +128,7 @@ impl StubDefinition {
     }
 
     pub fn client_encoder_package_name(&self) -> wit_encoder::PackageName {
+        // TODO here is where you'd use the names provided by the schemafiles
         naming::wit::client_encoder_package_name(&self.source_package_name)
     }
 

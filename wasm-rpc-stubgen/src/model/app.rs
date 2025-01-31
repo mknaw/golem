@@ -168,17 +168,25 @@ pub enum DependencyType {
     DynamicWasmRpc,
     /// Static (composed with compiled stub) wasm-rpc
     StaticWasmRpc,
+    /// TODO comment
+    Grpc,
 }
 
 impl DependencyType {
     pub const STATIC_WASM_RPC: &'static str = "static-wasm-rpc";
     pub const WASM_RPC: &'static str = "wasm-rpc";
+    pub const GRPC: &'static str = "grpc";
 
     pub fn as_str(&self) -> &'static str {
         match self {
             DependencyType::DynamicWasmRpc => Self::WASM_RPC,
             DependencyType::StaticWasmRpc => Self::STATIC_WASM_RPC,
+            DependencyType::Grpc => Self::GRPC,
         }
+    }
+
+    pub fn should_do_dynamic_linking(&self) -> bool {
+        matches!(self, Self::DynamicWasmRpc | Self::Grpc)
     }
 }
 
@@ -189,6 +197,7 @@ impl FromStr for DependencyType {
         match str {
             Self::WASM_RPC => Ok(Self::DynamicWasmRpc),
             Self::STATIC_WASM_RPC => Ok(Self::StaticWasmRpc),
+            Self::GRPC => Ok(Self::Grpc),
             _ => Err(()),
         }
     }

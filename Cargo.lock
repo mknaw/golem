@@ -4316,13 +4316,14 @@ dependencies = [
  "cargo_metadata 0.19.1",
  "git-version",
  "golem-wasm-ast",
+ "petgraph",
  "poem-openapi",
  "proptest",
  "proptest-arbitrary-interop",
  "prost 0.13.4",
  "prost-build 0.13.4",
  "prost-types 0.13.4",
- "protox-parse",
+ "protox-parse 0.7.0",
  "semver",
  "serde",
  "serde_json",
@@ -7843,7 +7844,7 @@ dependencies = [
  "prost 0.12.6",
  "prost-reflect",
  "prost-types 0.12.6",
- "protox-parse",
+ "protox-parse 0.6.1",
  "thiserror 1.0.69",
 ]
 
@@ -7856,6 +7857,18 @@ dependencies = [
  "logos",
  "miette",
  "prost-types 0.12.6",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "protox-parse"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a3a462d115462c080ae000c29a47f0b3985737e5d3a995fcdbcaa5c782068dde"
+dependencies = [
+ "logos",
+ "miette",
+ "prost-types 0.13.4",
  "thiserror 1.0.69",
 ]
 

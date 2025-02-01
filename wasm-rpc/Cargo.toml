@@ -26,7 +26,9 @@ bincode = { workspace = true, optional = true }
 git-version = "0.3.9"
 golem-wasm-ast = { path = "../wasm-ast", version = "0.0.0", optional = true }
 poem-openapi = { workspace = true, optional = true }
-protox-parse = "0.6.1"
+petgraph = "0.6.5"
+prost-build = "0.13.4"
+protox-parse = "0.7.0"
 semver = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }

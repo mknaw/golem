@@ -1,15 +1,20 @@
+use std::collections::HashMap;
 use std::convert::TryFrom;
 
 use anyhow::anyhow;
 use prost_types::field_descriptor_proto::{Label, Type as ProtobufType};
 use prost_types::{DescriptorProto, FieldDescriptorProto};
 use semver::Version;
-use wit_encoder::{Interface, Package, PackageName, Type as WitType, TypeDef as WitTypeDef};
+use wit_encoder::{
+    Interface, InterfaceItem, Package, PackageName, StandaloneFunc, Type as WitType,
+    TypeDef as WitTypeDef, TypeDefKind as WitTypeDefKind,
+};
 
 const TYPES_INTERFACE: &str = "types";
 
 pub fn grpc_to_wit(source: &str) -> anyhow::Result<Package> {
-    let parsed = protox_parse::parse("todo.proto", source).map_err(|e| anyhow!(e))?;
+    // TODO have to figure out how to pass it a name (`"TODO.proto"`)
+    let parsed = protox_parse::parse("TODO.proto", source).map_err(|e| anyhow!(e))?;
     let grpc_package = parsed
         .package
         .as_ref()
@@ -24,10 +29,68 @@ pub fn grpc_to_wit(source: &str) -> anyhow::Result<Package> {
         add_message_type(&mut types_interface, &message)?;
     }
 
-    // for service in parsed.service {}
+    // TODO this may be a little wasteful...
+    let type_defs: HashMap<String, WitTypeDef> = types_interface
+        .items()
+        .iter()
+        .filter_map(|item| {
+            if let InterfaceItem::TypeDef(type_def) = item {
+                Some(type_def)
+            } else {
+                None
+            }
+        })
+        .map(|type_def| (type_def.name().as_ref().to_string(), type_def.clone()))
+        .collect();
 
     let mut package = Package::new(package_name);
     package.interface(types_interface);
+
+    for service in parsed.service {
+        let name = service
+            .name
+            .as_deref()
+            .ok_or_else(|| anyhow!("service name not found"))
+            .map(title_to_kebab)?;
+        let mut service_interface = Interface::new(name);
+
+        for type_def in type_defs.values() {
+            service_interface.use_type("types", type_def.name().clone(), None);
+        }
+
+        for method in service.method {
+            let func_name = method
+                .name
+                .as_deref()
+                .ok_or_else(|| anyhow!("method name not found"))
+                .map(title_to_kebab)?;
+
+            let mut func = StandaloneFunc::new(func_name);
+
+            let var_name = method
+                .input_type
+                .as_deref()
+                .ok_or_else(|| anyhow!("method input_type not found"))
+                .map(title_to_kebab)?;
+
+            // TODO what's the difference between `TypeDef` and `Type`?
+            let wit_type_def = type_defs
+                .get(&var_name)
+                .ok_or_else(|| anyhow!("type not found: {}", var_name))?;
+
+            match wit_type_def.kind() {
+                WitTypeDefKind::Type(wit_type) => {
+                    func.set_params((var_name, wit_type.clone()));
+                }
+                // TODO not sure if this is appropriate for all cases!
+                _ => func.set_params((var_name.clone(), WitType::Named(var_name.into()))),
+            }
+
+            service_interface.function(func);
+        }
+
+        package.interface(service_interface);
+    }
 
     Ok(package)
 }
@@ -94,6 +157,8 @@ fn proto_field_to_wit_type(field: &FieldDescriptorProto) -> anyhow::Result<WitTy
     let primitive = res?;
     let label = field.label.map(Label::try_from).transpose()?;
     // TODO do we have to do anything fancy with the `Label::Required`?
+    // TODO maybe the "optional everything" thing that gRPC does needs special consideration..
+    // in fact I think we should be saying `Option` if it's a `proto3_optional`.
     let wit_type = match label {
         Some(Label::Repeated) => WitType::List(Box::new(primitive)),
         Some(Label::Optional) => WitType::Option(Box::new(primitive)),
@@ -271,7 +336,7 @@ interface todo-service {
 
     #[test]
     pub fn grpc_to_wit() {
-        let package = super::grpc_to_wit(SOURCE).unwrap();
+        let package = super::grpc_to_wit(SOURCE).unwrap_or_else(|e| panic!("{}", e));
         println!("{}", package.to_string());
         assert_eq!(package.to_string(), EXPECTED);
     }

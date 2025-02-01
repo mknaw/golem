@@ -1,28 +1,12 @@
-// use std::iter;
 use std::convert::TryFrom;
 
 use anyhow::anyhow;
-use prost_types::field_descriptor_proto::Label;
+use prost_types::field_descriptor_proto::{Label, Type as ProtobufType};
 use prost_types::{DescriptorProto, FieldDescriptorProto};
 use semver::Version;
-use wit_encoder::{Interface, Package, PackageName, Type, TypeDef};
+use wit_encoder::{Interface, Package, PackageName, Type as WitType, TypeDef as WitTypeDef};
 
 const TYPES_INTERFACE: &str = "types";
-
-// TODO have to try a recursive type
-//
-// oneof         -> variant
-// message       -> record
-// string        -> string
-// int32         -> s32
-// int64         -> s64
-// uint32        -> u32
-// uint64        -> u64
-// float         -> float32
-// double        -> float64
-// bool/boolean  -> bool
-// repeated T    -> list<T>
-// optional T    -> option<T>
 
 pub fn grpc_to_wit(source: &str) -> anyhow::Result<Package> {
     let parsed = protox_parse::parse("todo.proto", source).map_err(|e| anyhow!(e))?;
@@ -60,41 +44,87 @@ fn extract_version(grpc_package: &str) -> Option<Version> {
     // TODO
     return Some(Version::new(1, 0, 0));
 }
+// TODO have to try a recursive type
+//
+// oneof         -> variant
+// message       -> record
+// string        -> string
+// int32         -> s32
+// int64         -> s64
+// uint32        -> u32
+// uint64        -> u64
+// float         -> float32
+// double        -> float64
+// bool/boolean  -> bool
+// repeated T    -> list<T>
+// optional T    -> option<T>
 
-// TODO I could take it or leave it with this layout of the two fns
-fn proto_type_name_to_wit_primitive(type_name: &str) -> anyhow::Result<Type> {
-    let wit_type = match type_name {
-        "string" => Type::String,
-        "int32" => Type::S32,
-        "int64" => Type::S64,
-        "uint32" => Type::U32,
-        "uint64" => Type::U64,
-        "float" => Type::F32,
-        "double" => Type::F64,
-        "bool" => Type::Bool,
-        // TODO repeated T
-        // TODO optional T
-        name => Type::Named(name.to_owned().into()),
+fn proto_field_to_wit_type(field: &FieldDescriptorProto) -> anyhow::Result<WitType> {
+    // TODO (not a big deal) is there some cleaner way to not have intermediate var?
+    let res: anyhow::Result<WitType> = match field.r#type {
+        Some(variant) => {
+            let protobuf_type = ProtobufType::try_from(variant)?;
+            let wit_type = match protobuf_type {
+                ProtobufType::Bool => WitType::Bool,
+                ProtobufType::Uint32 => WitType::U32,
+                ProtobufType::Uint64 => WitType::U64,
+                ProtobufType::Int32 => WitType::S32,
+                ProtobufType::Int64 => WitType::S64,
+                ProtobufType::Float => WitType::F32,
+                ProtobufType::Double => WitType::F64,
+                ProtobufType::String => WitType::String,
+                ProtobufType::Fixed64 => todo!(),
+                ProtobufType::Fixed32 => todo!(),
+                ProtobufType::Group => todo!(),
+                ProtobufType::Message => todo!(),
+                ProtobufType::Bytes => todo!(),
+                ProtobufType::Enum => todo!(),
+                ProtobufType::Sfixed32 => todo!(),
+                ProtobufType::Sfixed64 => todo!(),
+                ProtobufType::Sint32 => todo!(),
+                ProtobufType::Sint64 => todo!(),
+            };
+            return Ok(wit_type);
+        }
+        None => match field.type_name.as_ref() {
+            Some(name) => Ok(WitType::Named(title_to_kebab(name).into())),
+            None => Err(anyhow!("neither type nor field_type defined")),
+        },
     };
-    Ok(wit_type)
-}
-
-// TODO error handling
-fn proto_field_to_wit_type(field: &FieldDescriptorProto) -> anyhow::Result<Type> {
-    let type_name = field
-        .type_name
-        .as_ref()
-        .ok_or_else(|| anyhow!("field type name not found for field {:?}", field))?;
-    let primitive = proto_type_name_to_wit_primitive(type_name)?;
+    let primitive = res?;
     let label = field.label.map(Label::try_from).transpose()?;
     // TODO do we have to do anything fancy with the `Label::Required`?
     let wit_type = match label {
-        Some(Label::Repeated) => Type::List(Box::new(primitive)),
-        Some(Label::Optional) => Type::Option(Box::new(primitive)),
+        Some(Label::Repeated) => WitType::List(Box::new(primitive)),
+        Some(Label::Optional) => WitType::Option(Box::new(primitive)),
         _ => primitive,
     };
 
     Ok(wit_type)
+}
+
+// TODO OK to rely on the input following these conventions?
+fn snake_to_kebab(input: &str) -> String {
+    input.replace("_", "-")
+}
+
+fn title_to_kebab(title: &str) -> String {
+    let mut kebab = String::new();
+    let mut prev_char = ' ';
+
+    for c in title.chars() {
+        if c.is_uppercase() {
+            if prev_char != ' ' {
+                kebab.push('-');
+            }
+            kebab.push(c.to_lowercase().next().unwrap());
+        } else {
+            kebab.push(c);
+        }
+        prev_char = c;
+    }
+
+    kebab
 }
 
 fn add_message_type(
@@ -103,8 +133,9 @@ fn add_message_type(
 ) -> anyhow::Result<()> {
     let name = message_type
         .name
-        .clone()
-        .ok_or_else(|| anyhow!("message type name not found"))?;
+        .as_deref()
+        .ok_or_else(|| anyhow!("message type name not found"))
+        .map(title_to_kebab)?;
 
     let fields = message_type
         .field
@@ -112,15 +143,16 @@ fn add_message_type(
         .map(|field| {
             let field_name = field
                 .name
-                .clone()
-                .ok_or_else(|| anyhow!("field name not found"))?;
+                .as_deref()
+                .ok_or_else(|| anyhow!("field name not found"))
+                .map(snake_to_kebab)?;
 
             let field_type = proto_field_to_wit_type(field)?;
-            Ok((field_name, field_type))
+            Ok((snake_to_kebab(&field_name), field_type))
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
 
-    interface.type_def(TypeDef::record(name, fields));
+    interface.type_def(WitTypeDef::record(name, fields));
 
     Ok(())
 }
@@ -240,6 +272,7 @@ interface todo-service {
     #[test]
     pub fn grpc_to_wit() {
         let package = super::grpc_to_wit(SOURCE).unwrap();
+        println!("{}", package.to_string());
         assert_eq!(package.to_string(), EXPECTED);
     }
 }

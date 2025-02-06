@@ -23,6 +23,7 @@ use crate::wit_generate::{add_dependencies_to_stub_wit_dir, generate_client_wit_
 use crate::wit_resolve::ResolvedWitDir;
 use anyhow::{anyhow, Context};
 use fs_extra::dir::CopyOptions;
+use golem_wasm_rpc::grpc::grpc_to_wit;
 use heck::ToSnakeCase;
 use std::path::{Path, PathBuf};
 
@@ -58,6 +59,8 @@ pub fn generate_and_copy_client_wit(
     stub_def: &StubDefinition,
     dest_wit_root: &Path,
 ) -> anyhow::Result<()> {
+    // TODO this still seems to write the whole wit just like before? but why...?
+    // I guess still need the generated WIT, just can get away without the client build?
     let _ = generate_client_wit_dir(stub_def)?;
     fs::create_dir_all(dest_wit_root).context("Failed to create the target WIT root directory")?;
     fs_extra::dir::copy(
@@ -120,4 +123,11 @@ pub fn generate_client_wit_dir(stub_def: &StubDefinition) -> anyhow::Result<Reso
     stub_def
         .resolve_client_wit()
         .context("Failed to resolve the result WIT root")
+}
+
+pub fn generate_wit_for_grpc_dep(source: &PathBuf) -> anyhow::Result<()> {
+    let protobuf = fs::read_to_string(source)?;
+    let package = grpc_to_wit(&protobuf);
+    dbg!(&package);
+    todo!()
 }

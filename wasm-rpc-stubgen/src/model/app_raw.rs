@@ -161,4 +161,5 @@ pub struct Dependency {
     #[serde(rename = "type")]
     pub type_: String,
     pub target: Option<String>,
+    pub source: Option<String>,
 }

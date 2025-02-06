@@ -253,8 +253,13 @@ async fn gen_rpc<CPE: ComponentPropertiesExtensions>(
             create_generated_base_wit(ctx, &component_name)?;
         }
 
+        // TODO here is the next thing to fix
         for dep in &ctx.application.all_wasm_rpc_dependencies() {
             build_client(ctx, dep).await?;
+        }
+
+        for dep in &ctx.application.all_grpc_dependencies() {
+            generate_wit_from_grpc(ctx, dep).await?;
         }
     }
 
@@ -1434,9 +1439,12 @@ async fn build_client<CPE: ComponentPropertiesExtensions>(
                 .unwrap_or_default()
         })
         .collect();
+    dbg!(&client_sources);
 
     let client_wasm = ctx.application.client_wasm(&component.name);
+    dbg!(&client_wasm);
     let client_wit = ctx.application.client_wit(&component.name);
+    dbg!(&client_wit);
     let task_result_marker = TaskResultMarker::new(
         &ctx.application.task_result_marker_dir(),
         ComponentGeneratorMarkerHash {
@@ -1530,6 +1538,8 @@ async fn build_client<CPE: ComponentPropertiesExtensions>(
                         commands::generate::generate_and_copy_client_wit(stub_def, &client_wit)
                     }
                     DependencyType::Grpc => {
+                        panic!("currently have this implemented elsewhere");
+                        // TODO either keep this and delete `generate_wit_from_grpc`, or vice versa...
                         log_action(
                             "Building",
                             format!(
@@ -1881,4 +1891,64 @@ fn env_var_flag(name: &str) -> bool {
             flag.starts_with("t") || flag == "1"
         })
         .unwrap_or_default()
+}
+
+// TODO not sure if it will go here!
+async fn generate_wit_from_grpc<CPE: ComponentPropertiesExtensions>(
+    ctx: &mut ApplicationContext<CPE>,
+    component: &DependentComponent,
+) -> anyhow::Result<bool> {
+    // let stub_def = ctx.component_stub_def(&component.name)?;
+    // let client_wit_root = stub_def.client_wit_root();
+    //
+    // let client_dep_package_ids = stub_def.stub_dep_package_ids();
+    // let client_sources: Vec<PathBuf> = stub_def
+    //     .packages_with_wit_sources()
+    //     .flat_map(|(package_id, _, sources)| {
+    //         (client_dep_package_ids.contains(&package_id)
+    //             || package_id == stub_def.source_package_id)
+    //             .then(|| sources.files.iter().cloned())
+    //             .unwrap_or_default()
+    //     })
+    //     .collect();
+    //
+    // let client_wasm = ctx.application.client_wasm(&component.name);
+    // let client_wit = ctx.application.client_wit(&component.name);
+    let task_result_marker = TaskResultMarker::new(
+        &ctx.application.task_result_marker_dir(),
+        ComponentGeneratorMarkerHash {
+            component_name: &component.name,
+            // TODO not sure about the naming here
+            generator_kind: "wit",
+        },
+    )?;
+
+    // if is_up_to_date(...) {
+    task_result_marker.result(
+        async {
+            // TODO this is a little unfortunate with respect to the other generation...
+            match component.dep_type {
+                DependencyType::Grpc => {
+                    log_action(
+                        "Building",
+                        format!(
+                            "WASM gRPC client for {}",
+                            component.name.as_str().log_color_highlight()
+                        ),
+                    );
+                    let source = component.source.as_ref().ok_or_else(|| {
+                        anyhow!(
+                            "Component {} has no source",
+                            component.name.as_str().log_color_error_highlight()
+                        )
+                    })?;
+                    commands::generate::generate_wit_for_grpc_dep(source)
+                }
+                _ => Ok(()),
+            }
+        }
+        .await,
+    )?;
+
+    Ok(true)
 }

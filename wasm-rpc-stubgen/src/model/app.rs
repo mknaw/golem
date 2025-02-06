@@ -185,6 +185,10 @@ impl DependencyType {
         }
     }
 
+    pub fn is_wasm_rpc_dependency(&self) -> bool {
+        matches!(self, Self::DynamicWasmRpc | Self::StaticWasmRpc)
+    }
+
     pub fn should_do_dynamic_linking(&self) -> bool {
         matches!(self, Self::DynamicWasmRpc | Self::Grpc)
     }
@@ -207,6 +211,7 @@ impl FromStr for DependencyType {
 pub struct DependentComponent {
     pub name: ComponentName,
     pub dep_type: DependencyType,
+    pub source: Option<PathBuf>,
 }
 
 impl PartialOrd for DependentComponent {
@@ -260,7 +265,21 @@ impl<CPE: ComponentPropertiesExtensions> Application<CPE> {
     }
 
     pub fn all_wasm_rpc_dependencies(&self) -> BTreeSet<DependentComponent> {
-        self.dependencies.values().flatten().cloned().collect()
+        self.dependencies
+            .values()
+            .flatten()
+            .filter(|dep| dep.dep_type.is_wasm_rpc_dependency())
+            .cloned()
+            .collect()
+    }
+
+    pub fn all_grpc_dependencies(&self) -> BTreeSet<DependentComponent> {
+        self.dependencies
+            .values()
+            .flatten()
+            .filter(|dep| matches!(dep.dep_type, DependencyType::Grpc))
+            .cloned()
+            .collect()
     }
 
     pub fn all_profiles(&self) -> BTreeSet<ProfileName> {
@@ -1023,6 +1042,7 @@ mod app_builder {
                                 let dependent_component = DependentComponent {
                                     name: target_name.into(),
                                     dep_type,
+                                    source: dependency.source.map(PathBuf::from),
                                 };
 
                                 let unique_key = UniqueSourceCheckedEntityKey::WasmRpcDependency((
@@ -1036,6 +1056,7 @@ mod app_builder {
                                         .insert(dependent_component);
                                 }
                             }
+                            // TODO actually probably this is OK for grpc / openapi types
                             None => validation.add_error(format!(
                                 "Missing {} field for component wasm-rpc dependency",
                                 "target".log_color_error_highlight()
@@ -1073,7 +1094,9 @@ mod app_builder {
             for (component, deps) in &self.dependencies {
                 for target in deps {
                     let invalid_source = !self.raw_components.contains_key(component);
-                    let invalid_target = !self.raw_components.contains_key(&target.name);
+                    // TODO move this additional condition to some more civilly named method
+                    let invalid_target = target.dep_type != DependencyType::Grpc
+                        && !self.raw_components.contains_key(&target.name);
 
                     if invalid_source || invalid_target {
                         let source = self

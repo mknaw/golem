@@ -185,10 +185,6 @@ impl DependencyType {
         }
     }
 
-    pub fn is_wasm_rpc_dependency(&self) -> bool {
-        matches!(self, Self::DynamicWasmRpc | Self::StaticWasmRpc)
-    }
-
     pub fn should_do_dynamic_linking(&self) -> bool {
         matches!(self, Self::DynamicWasmRpc | Self::Grpc)
     }
@@ -265,12 +261,7 @@ impl<CPE: ComponentPropertiesExtensions> Application<CPE> {
     }
 
     pub fn all_wasm_rpc_dependencies(&self) -> BTreeSet<DependentComponent> {
-        self.dependencies
-            .values()
-            .flatten()
-            .filter(|dep| dep.dep_type.is_wasm_rpc_dependency())
-            .cloned()
-            .collect()
+        self.dependencies.values().flatten().cloned().collect()
     }
 
     pub fn all_grpc_dependencies(&self) -> BTreeSet<DependentComponent> {

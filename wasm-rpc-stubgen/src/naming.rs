@@ -135,6 +135,7 @@ pub mod wit {
         format!("{}_{}.wit", package_name.namespace, package_name.name)
     }
 
+    // TODO whats all this now
     pub fn package_wit_dep_dir_from_package_dir_name(package_dir_name: &str) -> PathBuf {
         Path::new(WIT_DIR).join(DEPS_DIR).join(package_dir_name)
     }

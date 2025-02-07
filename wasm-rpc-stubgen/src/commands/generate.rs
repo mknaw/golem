@@ -16,6 +16,7 @@ use crate::cargo::generate_cargo_toml;
 use crate::compilation::compile;
 use crate::fs;
 use crate::log::{log_action, LogColorize, LogIndent};
+use crate::model::app::DependentComponent;
 use crate::naming;
 use crate::rust::generate_stub_source;
 use crate::stub::StubDefinition;
@@ -125,9 +126,26 @@ pub fn generate_client_wit_dir(stub_def: &StubDefinition) -> anyhow::Result<Reso
         .context("Failed to resolve the result WIT root")
 }
 
-pub fn generate_wit_for_grpc_dep(source: &PathBuf) -> anyhow::Result<()> {
+pub fn generate_wit_for_grpc_dep(
+    generated_base_wit_root: &PathBuf,
+    component: &DependentComponent,
+) -> anyhow::Result<()> {
+    let source = component.source.as_ref().ok_or_else(|| {
+        anyhow!(
+            "Component {} has no source",
+            component.name.as_str().log_color_error_highlight()
+        )
+    })?;
     let protobuf = fs::read_to_string(source)?;
-    let package = grpc_to_wit(&protobuf);
-    dbg!(&package);
-    todo!()
+    let package = grpc_to_wit(&protobuf)?;
+
+    fs::create_dir_all(&generated_base_wit_root)
+        .context("Failed to create the target WIT root directory")?;
+    fs::write(
+        &generated_base_wit_root
+            // TODO probably could be more elegant here
+            .join(format!("{}.wit", component.name.as_str())),
+        package.to_string(),
+    )?;
+    Ok(())
 }

@@ -261,10 +261,12 @@ async fn gen_rpc<CPE: ComponentPropertiesExtensions>(
                     dep.name.as_str().log_color_highlight()
                 ),
             );
-            commands::generate::generate_wit_for_grpc_dep(
-                &ctx.application.component_generated_base_wit(&dep.name),
-                dep,
-            )?;
+            let wit_dir = ctx.application.component_generated_base_wit(&dep.name);
+            commands::generate::generate_wit_for_grpc_dep(&wit_dir, dep)?;
+            {
+                let _indent = LogIndent::new();
+                extract_exports_as_wit_dep(&wit_dir)?;
+            }
         }
 
         for dep in &ctx.application.all_wasm_rpc_dependencies() {
@@ -1448,12 +1450,9 @@ async fn build_client<CPE: ComponentPropertiesExtensions>(
                 .unwrap_or_default()
         })
         .collect();
-    dbg!(&client_sources);
 
     let client_wasm = ctx.application.client_wasm(&component.name);
-    dbg!(&client_wasm);
     let client_wit = ctx.application.client_wit(&component.name);
-    dbg!(&client_wit);
     let task_result_marker = TaskResultMarker::new(
         &ctx.application.task_result_marker_dir(),
         ComponentGeneratorMarkerHash {
@@ -1522,7 +1521,9 @@ async fn build_client<CPE: ComponentPropertiesExtensions>(
 
                         Ok(())
                     }
-                    DependencyType::DynamicWasmRpc => {
+                    // TODO might have to do something special here for Grpc...
+                    // at least do different logging
+                    DependencyType::DynamicWasmRpc | DependencyType::Grpc => {
                         log_action(
                             "Generating",
                             format!(
@@ -1545,19 +1546,6 @@ async fn build_client<CPE: ComponentPropertiesExtensions>(
 
                         let stub_def = ctx.component_stub_def(&component.name)?;
                         commands::generate::generate_and_copy_client_wit(stub_def, &client_wit)
-                    }
-                    DependencyType::Grpc => {
-                        panic!("currently have this implemented elsewhere");
-                        // TODO either keep this and delete `generate_wit_from_grpc`, or vice versa...
-                        log_action(
-                            "Building",
-                            format!(
-                                "WASM gRPC client for {}",
-                                component.name.as_str().log_color_highlight()
-                            ),
-                        );
-                        // TODO implement!
-                        Ok(())
                     }
                 }
             }

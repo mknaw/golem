@@ -6,8 +6,8 @@ use prost_types::field_descriptor_proto::{Label, Type as ProtobufType};
 use prost_types::{DescriptorProto, FieldDescriptorProto};
 use semver::Version;
 use wit_encoder::{
-    Interface, InterfaceItem, Package, PackageName, StandaloneFunc, Type as WitType,
-    TypeDef as WitTypeDef, TypeDefKind as WitTypeDefKind,
+    Interface, InterfaceItem, Package, PackageItem, PackageName, StandaloneFunc, Type as WitType,
+    TypeDef as WitTypeDef, TypeDefKind as WitTypeDefKind, World,
 };
 
 const TYPES_INTERFACE: &str = "types";
@@ -43,7 +43,7 @@ pub fn grpc_to_wit(source: &str) -> anyhow::Result<Package> {
         .map(|type_def| (type_def.name().as_ref().to_string(), type_def.clone()))
         .collect();
 
-    let mut package = Package::new(package_name);
+    let mut package = Package::new(package_name.clone());
     package.interface(types_interface);
 
     for service in parsed.service {
@@ -91,6 +91,17 @@ pub fn grpc_to_wit(source: &str) -> anyhow::Result<Package> {
 
         package.interface(service_interface);
     }
+
+    let mut world = World::new(package_name.name().clone());
+    for item in package.items().iter() {
+        match item {
+            PackageItem::Interface(interface) => {
+                world.named_interface_export(interface.name().clone());
+            }
+            _ => unreachable!(),
+        }
+    }
+    package.world(world);
 
     Ok(package)
 }

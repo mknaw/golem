@@ -36,7 +36,6 @@ use golem_wasm_rpc_stubgen::commands::app::{
 };
 use golem_wasm_rpc_stubgen::log::Output;
 use golem_wasm_rpc_stubgen::model::app;
-use golem_wasm_rpc_stubgen::model::app::DependencyType;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::marker::PhantomData;
 use std::path::PathBuf;
